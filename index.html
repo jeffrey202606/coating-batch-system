@@ -1,0 +1,1876 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>涂布小卷切分批号管理系统</title>
+    <!-- 引入条码与二维码库 -->
+    <script src="https://cdn.staticfile.org/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
+    <script src="https://cdn.staticfile.org/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        :root {
+            --ink: #0E1B2B;
+            --ink-2: #16293B;
+            --accent: #0E7C86;
+            --accent-deep: #0B636B;
+            --accent-soft: #E6F2F1;
+            --paper: #EDF1F4;
+            --surface: #FFFFFF;
+            --line: #E4E9EF;
+            --line-strong: #D4DCE4;
+            --text: #16242F;
+            --muted: #6A7682;
+            --success: #1E8E5A;
+            --success-soft: #E4F4EC;
+            --warning: #C8842B;
+            --warning-soft: #FBF0DF;
+            --danger: #D14343;
+            --danger-soft: #FBE7E7;
+            --radius: 14px;
+            --radius-sm: 9px;
+            --shadow-sm: 0 1px 2px rgba(16,32,48,.04), 0 4px 14px rgba(16,32,48,.05);
+            --shadow-md: 0 8px 22px -8px rgba(16,32,48,.18);
+            --shadow-lg: 0 22px 48px -16px rgba(14,27,43,.45);
+            --mono: "SF Mono", "JetBrains Mono", "Roboto Mono", "Cascadia Code", Consolas, "Courier New", monospace;
+            --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Roboto, Helvetica, Arial, sans-serif;
+        }
+        * { box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: var(--sans);
+            margin: 0; padding: 0;
+            background:
+                radial-gradient(1200px 600px at 85% -5%, rgba(14,124,134,.06), transparent 60%),
+                radial-gradient(900px 500px at -5% 10%, rgba(14,27,43,.04), transparent 55%),
+                var(--paper);
+            color: var(--text);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ============ 图标 ============ */
+        .ic { width: 16px; height: 16px; flex: none; display: inline-block; vertical-align: middle; }
+
+        /* ============ 顶部固定导航栏 ============ */
+        .top-nav {
+            position: fixed; top: 0; left: 0; right: 0; height: 66px;
+            background: linear-gradient(120deg, var(--ink), var(--ink-2));
+            color: #fff; display: flex; align-items: center; justify-content: space-between;
+            padding: 0 28px; z-index: 1000;
+            box-shadow: 0 8px 28px -10px rgba(14,27,43,.55);
+        }
+        .top-nav::before {
+            content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+            background: linear-gradient(90deg, var(--accent), #46C2B8 60%, transparent);
+        }
+        .logo { display: flex; align-items: center; gap: 12px; font-size: 18px; font-weight: 700; letter-spacing: .3px; }
+        .logo .mark {
+            width: 36px; height: 36px; border-radius: 10px;
+            background: linear-gradient(135deg, var(--accent), #15A39C);
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 6px 16px -4px rgba(14,124,134,.65);
+        }
+        .logo .mark .ic { width: 20px; height: 20px; color: #EAFBF9; }
+        .logo small { display: block; font-size: 11px; font-weight: 500; color: #8FA3B3; letter-spacing: 1.5px; margin-top: 1px; }
+        .top-nav .actions { display: flex; gap: 10px; }
+        .top-nav button { padding: 8px 14px; font-size: 13px; font-weight: 500; }
+        .top-nav .btn-outline {
+            background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.18); color: #EAF0F4;
+        }
+        .top-nav .btn-outline:hover { background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.3); color: #fff; }
+
+        /* ============ 按钮 ============ */
+        button {
+            font-family: var(--sans); cursor: pointer; border: none; border-radius: var(--radius-sm);
+            font-weight: 600; font-size: 13px; color: #fff;
+            display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+            user-select: none; padding: 9px 16px; position: relative; overflow: hidden;
+            transition: transform .15s cubic-bezier(.2,.8,.2,1), box-shadow .2s, background .2s, filter .2s, border-color .2s;
+        }
+        button svg { width: 16px; height: 16px; flex: none; }
+        button:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
+        button:active { transform: translateY(0) scale(.97); box-shadow: none; }
+        button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+        .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent-deep)); box-shadow: 0 6px 16px -6px rgba(14,124,134,.6); }
+        .btn-primary:hover { filter: brightness(1.06); }
+        .btn-success { background: linear-gradient(135deg, #22A06B, var(--success)); }
+        .btn-warning { background: linear-gradient(135deg, #E0982F, var(--warning)); }
+        .btn-gray { background: linear-gradient(135deg, #7C8896, #5F6B78); }
+        .btn-danger { background: linear-gradient(135deg, #E15A5A, var(--danger)); }
+        .btn-outline { background: transparent; border: 1px solid var(--line-strong); color: var(--text); }
+        .btn-outline:hover { background: #F4F8F9; border-color: var(--accent); color: var(--accent-deep); box-shadow: none; }
+        .btn-loading { pointer-events: none; opacity: .9; }
+        .btn-loading .ic { animation: spin .7s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ============ 主容器 ============ */
+        .container { max-width: 1450px; margin: 94px auto 40px; padding: 0 22px; }
+
+        /* ============ 卡片 ============ */
+        .card {
+            background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+            padding: 24px 26px; margin-bottom: 22px; box-shadow: var(--shadow-sm);
+            position: relative; overflow: hidden;
+            animation: cardIn .6s cubic-bezier(.2,.8,.2,1) both;
+        }
+        .card::after {
+            content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+            background: linear-gradient(90deg, var(--accent), transparent 65%); opacity: .55;
+        }
+        .container > .card:nth-child(1) { animation-delay: .04s; }
+        .container > .card:nth-child(2) { animation-delay: .14s; }
+        .container > .card:nth-child(3) { animation-delay: .24s; }
+        @keyframes cardIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
+        .card.is-primary { background: linear-gradient(180deg, #F7FBFB, #FFFFFF); border-color: #CFE6E4; }
+        .card.is-primary::after { opacity: .9; background: linear-gradient(90deg, var(--accent), #9AD9D2 70%, transparent); }
+
+        .card-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--line); gap: 12px; flex-wrap: wrap;
+        }
+        .card-header .title-wrap { display: flex; align-items: center; gap: 12px; }
+        .step-badge {
+            width: 28px; height: 28px; border-radius: 9px; flex: none;
+            background: var(--accent-soft); color: var(--accent-deep); font-weight: 800; font-size: 13px;
+            display: flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums;
+            box-shadow: inset 0 0 0 1px rgba(14,124,134,.18);
+        }
+        .card-header .title-wrap .ttl { font-size: 16px; font-weight: 700; color: var(--ink); letter-spacing: .2px; }
+        .card-header .title-wrap .sub { font-size: 12px; color: var(--muted); font-weight: 500; }
+
+        /* ============ 编码规则说明 ============ */
+        .rule-hint {
+            background: var(--accent-soft); border-left: 3px solid var(--accent);
+            padding: 8px 12px; border-radius: 0 8px 8px 0; font-size: 12.5px;
+            color: #13585C; margin-bottom: 11px; line-height: 1.6;
+        }
+        .rule-hint code {
+            font-family: var(--mono); background: rgba(14,124,134,.12); padding: 1px 6px;
+            border-radius: 5px; color: var(--accent-deep); font-size: 12.5px;
+        }
+        .rule-hint.warn { background: var(--warning-soft); border-left-color: var(--warning); color: #8A5410; }
+        .rule-hint.warn code { background: rgba(200,132,43,.16); color: #8A5410; }
+
+        /* ============ 表单 ============ */
+        .form-grid { display: grid; gap: 16px; }
+        .form-group { display: flex; flex-direction: column; }
+        .form-group label { font-size: 12px; font-weight: 600; margin-bottom: 5px; color: var(--muted); line-height: 1.35; overflow-wrap: anywhere; letter-spacing: .2px; }
+        .form-group input, .form-group select {
+            padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
+            font-size: 13.5px; color: var(--text); transition: border .2s, box-shadow .2s, background .2s;
+            background: #FBFCFD; font-family: var(--sans); width: 100%;
+        }
+        .form-group input:focus, .form-group select:focus {
+            border-color: var(--accent); background: #fff; outline: none;
+            box-shadow: 0 0 0 3px rgba(14,124,134,.15);
+        }
+        .num { font-variant-numeric: tabular-nums; font-family: var(--mono); letter-spacing: .3px; }
+        .field-hint { font-size: 11.5px; margin-top: 4px; color: var(--muted); line-height: 1.4; }
+        .field-hint.warn { color: var(--danger); font-weight: 600; }
+
+        /* 母卷批号 —— 仪表读数样式 */
+        .mother-roll-highlight {
+            font-family: var(--mono); font-weight: 700; font-size: 16px; color: var(--accent-deep);
+            background: linear-gradient(180deg, #F4FAFA, #EAF4F3); border: 1.5px solid #BFE0DE;
+            border-radius: var(--radius-sm); padding: 9px 10px; text-align: center; letter-spacing: 1.2px; width: 100%;
+            box-shadow: inset 0 1px 3px rgba(14,124,134,.08); transition: border .2s, box-shadow .2s, background .2s;
+        }
+        .mother-roll-highlight:focus { border-color: var(--accent); background: #fff; box-shadow: 0 0 0 3px rgba(14,124,134,.15); }
+        .mother-roll-highlight.pulse { animation: rollPulse .8s ease; }
+        @keyframes rollPulse { 0% { box-shadow: 0 0 0 0 rgba(14,124,134,.4); } 100% { box-shadow: 0 0 0 12px rgba(14,124,134,0); } }
+
+        .grid-aligned { display: grid; grid-template-columns: minmax(120px, 1.6fr) minmax(72px, 0.8fr) minmax(72px, 0.8fr) minmax(128px, 1.35fr) minmax(150px, 2.45fr); gap: 10px; margin-bottom: 11px; }
+        .grid-mother-bg { background: #F7FAFB; padding: 16px; border-radius: 10px; border: 1px solid var(--line); align-items: center; }
+
+        .grid-spec {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)); gap: 6px;
+            background: #F7FAFB; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--line);
+        }
+        .grid-spec .form-group label { font-size: 11px; margin-bottom: 4px; }
+        .grid-spec .form-group input { padding: 6px 7px; font-size: 12px; }
+
+        /* ============ 切分参数 ============ */
+        .machine-layout { display: flex; gap: 16px; align-items: stretch; margin-bottom: 10px; }
+        .mother-roll-panel {
+            width: 200px; background: linear-gradient(180deg, #F2F9F8, #FFFFFF); padding: 16px;
+            border-radius: 10px; border: 1px solid #CFE6E4; display: flex; flex-direction: column; justify-content: center;
+            box-shadow: var(--shadow-sm);
+        }
+        .mother-roll-panel label { font-size: 12px; font-weight: 600; color: var(--accent-deep); margin-bottom: 10px; text-align: center; letter-spacing: .3px; }
+        .machine-table-panel { flex: 1; background: #fff; padding: 12px 16px; border-radius: 10px; border: 1px solid var(--line); overflow-x: auto; }
+
+        .machine-config-table { width: 100%; min-width: 560px; border-collapse: collapse; text-align: center; }
+        .machine-config-table th { background: #F4F8F9; padding: 9px 4px; font-weight: 700; color: #455A66; font-size: 12.5px; border-bottom: 1px solid var(--line); letter-spacing: .3px; }
+        .machine-config-table td { padding: 7px 4px; border-bottom: 1px solid var(--line); }
+        .machine-config-table tr:last-child td { border-bottom: none; }
+        .table-input.inline { background: #fff; border: 1px solid var(--line-strong); padding: 7px 6px; font-size: 13px; border-radius: 6px; text-align: center; width: 100%; transition: all .2s; font-family: var(--sans); }
+        /* 切分卷数 / 每卷米数：预留约3位字符宽度（窄框、居中、隐藏步进器让3位数字完整显示） */
+        .table-input.inline.num-3 { width: 3.6em; padding: 7px 2px; }
+        .table-input.inline.num-3::-webkit-outer-spin-button,
+        .table-input.inline.num-3::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .table-input.inline.num-3 { -moz-appearance: textfield; }
+        .table-input.inline:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 2px rgba(14,124,134,.14); }
+        .table-input.inline[type="date"] { min-width: 120px; }
+
+        /* 汇总栏 */
+        .summary-bar {
+            display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
+            background: linear-gradient(180deg, #F7FAFB, #EFF5F6); padding: 14px 22px; border-radius: var(--radius-sm);
+            border: 1px solid var(--line); margin-top: 12px;
+        }
+        .summary-text { font-size: 14px; color: var(--muted); display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+        .summary-text > div { display: flex; align-items: center; gap: 8px; }
+        .summary-highlight { font-family: var(--mono); font-size: 22px; font-weight: 700; color: var(--accent-deep); font-variant-numeric: tabular-nums; }
+        .diff-warning { color: #fff; font-weight: 600; display: none; font-size: 12.5px; background: var(--danger); padding: 5px 11px; border-radius: 20px; animation: warnPulse 1.4s ease-in-out infinite; }
+        @keyframes warnPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(209,67,67,.5); } 50% { box-shadow: 0 0 0 7px rgba(209,67,67,0); } }
+
+        .cta-generate { padding: 11px 28px; font-size: 15px; font-weight: 700; }
+
+        /* ============ 数据表格 ============ */
+        .table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--line-strong); max-height: 600px; background: #fff; }
+        table.data-table { width: 100%; border-collapse: collapse; text-align: center; font-size: 13px; table-layout: fixed; }
+        table.data-table th, table.data-table td { border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); padding: 10px 8px; overflow: hidden; text-overflow: ellipsis; }
+        table.data-table th { background: linear-gradient(180deg, #F4F8F9, #EEF3F4); font-weight: 700; color: #455A66; position: sticky; top: 0; z-index: 10; letter-spacing: .3px; }
+        table.data-table th:last-child, table.data-table td:last-child { border-right: none; }
+        table.data-table tr { transition: background .15s; }
+        table.data-table tbody tr:hover { background: #F4F9F9; }
+        table.data-table tbody tr.gen { animation: rowIn .42s cubic-bezier(.2,.8,.2,1) both; }
+        @keyframes rowIn { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: none; } }
+        input.table-input {
+            width: 100%; padding: 7px; border: 1px solid transparent; border-radius: 5px;
+            text-align: center; font-size: 13px; transition: all .2s; background: transparent; font-family: var(--sans); color: var(--text);
+        }
+        input.table-input:focus { border-color: var(--accent); background: #fff; outline: none; box-shadow: 0 0 0 2px rgba(14,124,134,.14); }
+        input.table-input:hover { border-color: var(--line-strong); }
+
+        .batch-actions { display: flex; gap: 5px; justify-content: center; margin-top: 7px; }
+        .batch-actions button { padding: 3px 9px; font-size: 11px; border-radius: 6px; gap: 4px; }
+
+        .qc-group { display: flex; justify-content: center; align-items: center; gap: 14px; }
+        .qc-label { display: inline-flex; align-items: center; cursor: pointer; font-size: 13px; gap: 5px; }
+        .qc-label input[type="checkbox"] { width: 16px; height: 16px; margin: 0; cursor: pointer; accent-color: var(--accent); }
+        .qc-label.pass input { accent-color: var(--success); }
+        .qc-label.fail input { accent-color: var(--danger); }
+
+        /* ============ 模态框 ============ */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(14, 27, 43, 0.62);
+            display: none; justify-content: center; align-items: center; z-index: 2000; backdrop-filter: blur(6px); padding: 20px;
+        }
+        .modal-content {
+            background: #fff; width: 500px; max-width: 100%; max-height: 90vh; border-radius: 16px;
+            padding: 28px 30px; box-shadow: var(--shadow-lg); overflow-y: auto; position: relative;
+            border: 1px solid var(--line); animation: modalIn .26s cubic-bezier(.2,.9,.2,1);
+        }
+        @keyframes modalIn { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
+        .modal-content h2 { margin: 0 0 4px; color: var(--ink); font-size: 19px; display: flex; align-items: center; gap: 10px; }
+        .modal-content h2 .ic { width: 20px; height: 20px; color: var(--accent); }
+        .modal-content h3 { font-size: 14px; color: var(--accent-deep); margin: 18px 0 6px; }
+        .modal-content p { font-size: 13.5px; color: #46535F; line-height: 1.7; margin: 4px 0; }
+        .modal-content > h2 + p, .modal-content .lead { color: var(--muted); font-size: 13px; }
+        .close-btn {
+            position: absolute; top: 16px; right: 16px; width: 34px; height: 34px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center; color: #93A4B2; background: #F1F5F7;
+            border: none; transition: background .2s, color .2s, transform .15s;
+        }
+        .close-btn:hover { background: var(--danger-soft); color: var(--danger); transform: rotate(90deg); }
+        .close-btn .ic { width: 16px; height: 16px; }
+
+        .preset-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; max-height: 220px; overflow-y: auto; padding: 4px; }
+        .preset-item { background: var(--accent-soft); padding: 7px 8px 7px 14px; border-radius: 22px; display: flex; align-items: center; gap: 8px; border: 1px solid #C9E4E1; font-size: 13px; color: #13585C; animation: cardIn .3s both; }
+        .preset-item button { padding: 0; border-radius: 50%; background: var(--danger); width: 20px; height: 20px; font-size: 12px; display: flex; align-items: center; justify-content: center; }
+        .preset-item button:hover { background: #B53030; transform: none; box-shadow: none; }
+
+        .history-table { width: 100%; border-collapse: collapse; text-align: center; font-size: 13px; }
+        .history-table th, .history-table td { border-bottom: 1px solid var(--line); padding: 10px 8px; }
+        .history-table th { background: #F4F8F9; color: #455A66; font-weight: 700; }
+        .history-table tbody tr { transition: background .15s; }
+        .history-table tbody tr:hover { background: #F4F9F9; }
+
+        /* ============ Toast ============ */
+        .toast-wrap { position: fixed; top: 82px; left: 50%; transform: translateX(-50%); z-index: 3000; display: flex; flex-direction: column; gap: 10px; align-items: center; pointer-events: none; }
+        .toast {
+            display: flex; align-items: center; gap: 10px; background: var(--ink); color: #fff;
+            padding: 12px 18px; border-radius: 12px; box-shadow: var(--shadow-lg); font-size: 14px; font-weight: 500;
+            max-width: 440px; border-left: 3px solid var(--accent); animation: toastIn .35s cubic-bezier(.2,.9,.2,1) both;
+        }
+        .toast .ic { width: 18px; height: 18px; flex: none; color: #5FE0D0; }
+        .toast.success { border-left-color: #34C98A; } .toast.success .ic { color: #5BE3A6; }
+        .toast.warn { border-left-color: var(--warning); } .toast.warn .ic { color: #F0B062; }
+        .toast.error { border-left-color: var(--danger); } .toast.error .ic { color: #F08A8A; }
+        .toast.out { animation: toastOut .3s ease forwards; }
+        @keyframes toastIn { from { opacity: 0; transform: translateY(-12px) scale(.96); } to { opacity: 1; transform: none; } }
+        @keyframes toastOut { to { opacity: 0; transform: translateY(-10px) scale(.97); } }
+
+        /* ============ 通用模态管理 ============ */
+        body.modal-open { overflow: hidden; }
+
+        /* ============ 自定义对话框（替代原生 alert / confirm / prompt） ============ */
+        .dialog-box { max-width: 440px; }
+        .dialog-title { font-size: 17px; align-items: center; gap: 10px; }
+        .dialog-title .dialog-icon { display: inline-flex; align-items: center; flex: none; }
+        .dialog-title .dialog-icon .ic { width: 22px; height: 22px; }
+        .dialog-title .dialog-icon.danger .ic { color: var(--danger); }
+        .dialog-title .dialog-icon.info .ic { color: var(--accent); }
+        .dialog-title .dialog-icon.warn .ic { color: var(--warning); }
+        .dialog-message { white-space: pre-line; line-height: 1.7; }
+        .dialog-input-wrap { margin-top: 16px; }
+        .dialog-input {
+            width: 100%; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
+            font-size: 14px; font-family: var(--sans); transition: border .2s, box-shadow .2s; background: #FBFCFD;
+        }
+        .dialog-input:focus { border-color: var(--accent); background: #fff; outline: none; box-shadow: 0 0 0 3px rgba(14,124,134,.15); }
+        .dialog-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; flex-wrap: wrap; }
+        .dialog-actions button { min-width: 92px; }
+
+        /* ============ 表单内联校验错误态 ============ */
+        .input-error { border-color: var(--danger) !important; box-shadow: 0 0 0 3px rgba(209,67,67,.14) !important; }
+        .field-error-msg { display: block; margin-top: 4px; font-size: 11.5px; color: var(--danger); font-weight: 600; line-height: 1.4; }
+
+        /* ============ 保存状态指示 ============ */
+        .save-status {
+            display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600;
+            padding: 6px 11px; border-radius: 20px; transition: all .3s; white-space: nowrap; margin-right: 2px;
+            background: rgba(255,255,255,.08); color: #C9D6DF;
+        }
+        .save-status .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
+        .save-status.dirty { color: #F0B062; background: rgba(200,132,43,.18); }
+        .save-status.saved { color: #5BE3A6; background: rgba(30,142,90,.2); }
+
+        /* ============ 数据表空状态 ============ */
+        .empty-state { text-align: center; padding: 46px 20px 50px; color: var(--muted); }
+        .empty-state .empty-icon { width: 54px; height: 54px; margin: 0 auto 14px; color: #B9C6D0; display: block; }
+        .empty-state .empty-title { font-size: 15px; font-weight: 700; color: #46535F; margin-bottom: 6px; }
+        .empty-state .empty-desc { font-size: 13px; line-height: 1.7; margin-bottom: 18px; }
+        .empty-state .empty-desc code { font-family: var(--mono); background: var(--accent-soft); color: var(--accent-deep); padding: 1px 6px; border-radius: 5px; }
+        .empty-state-td { position: static !important; background: transparent !important; }
+
+        @media (max-width: 560px) {
+            .save-status .save-status-text { display: none; }
+            .save-status { padding: 6px; }
+        }
+
+        /* ============ 打印专用 ============ */
+        #print-area { position: absolute; top: -9999px; left: -9999px; z-index: -1; }
+        @media print {
+            @page { size: A4; margin: 10mm; }
+            body { background: #fff; padding: 0; margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .top-nav, .container, .modal-overlay, .toast-wrap { display: none !important; }
+            #print-area { position: static; display: block !important; z-index: auto; }
+            .print-table { width: 100%; border-collapse: collapse; text-align: center; font-size: 12px; font-family: "SimSun", "宋体", sans-serif; table-layout: fixed; }
+            .print-table th, .print-table td { border: 1px solid #000; padding: 6px 4px; word-wrap: break-word; }
+            .text-left { text-align: left !important; }
+            .bg-gray { background-color: #f2f2f2 !important; }
+            .bold { font-weight: bold; }
+            .page-break { page-break-after: always; }
+            .label-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2mm; }
+            .print-label {
+                width: 48mm; height: 28mm; border: 1px dashed #666; box-sizing: border-box;
+                padding: 1.5mm; font-size: 10px; overflow: hidden; page-break-inside: avoid;
+                display: flex; flex-direction: column; justify-content: space-between;
+            }
+            .print-label .batch-no { font-size: 14px; font-weight: bold; text-align: center; font-family: monospace; margin: 1px 0; }
+            .print-label .barcode-box { display: flex; justify-content: space-between; align-items: center; height: 10mm; }
+            .print-label .info-row { display: flex; justify-content: space-between; line-height: 1.1; font-size: 9px; }
+        }
+
+        /* ============ 响应式 ============ */
+        /* —— 小屏 / 移动端（保留原桌面优先级联，确保手机可用） —— */
+        @media (max-width: 900px) {
+            .grid-aligned { grid-template-columns: repeat(2, 1fr); }
+            .machine-layout { flex-direction: column; }
+            .mother-roll-panel { width: 100%; }
+            .top-nav { padding: 0 14px; }
+            .top-nav .actions { gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+            .top-nav button { padding: 7px 10px; font-size: 12px; }
+            .logo small { display: none; }
+        }
+        @media (max-width: 560px) {
+            .grid-aligned { grid-template-columns: 1fr; }
+            .container { margin-top: 84px; padding: 0 14px; }
+            .card { padding: 18px; }
+            .summary-bar { flex-direction: column; align-items: stretch; }
+            .cta-generate { width: 100%; }
+        }
+
+        /* ============ 电脑端 / 大屏优化 ============ */
+        /* 明细表可读性：冻结首列（流水号）+ 斑马纹 + 悬停高亮 */
+        table.data-table th:first-child,
+        table.data-table td:first-child {
+            position: sticky; left: 0; z-index: 12;
+            background: var(--surface);
+        }
+        table.data-table thead th:first-child {
+            z-index: 13;
+            background: linear-gradient(180deg, #F4F8F9, #EEF3F4);
+        }
+        table.data-table tbody tr:nth-child(even) td { background: #FAFCFD; }
+        table.data-table tbody tr:hover td { background: #F4F9F9; }
+
+        /* 宽屏两栏：卡片01/02 并排，卡片03 全宽置底，高度统一 */
+        @media (min-width: 1280px) {
+            .container {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+                gap: 22px;
+                align-items: stretch;
+            }
+            .container > .card { margin-bottom: 0; display: flex; flex-direction: column; }
+            .container > .card:nth-child(3) { grid-column: 1 / -1; }
+            /* 卡片01：收紧内边距、保持 5 列紧凑排布，使列宽更窄、整体压低 */
+            .container > .card:nth-child(1) { padding: 18px 20px; }
+            .container > .card:nth-child(1) .grid-aligned { gap: 10px; margin-bottom: 10px; }
+            .container > .card:nth-child(1) .grid-spec { gap: 6px; }
+            /* 卡片02：与卡片01 同内边距，保持两栏视觉对称 */
+            .container > .card:nth-child(2) { padding: 18px 20px; }
+            /* 卡片02：母卷面板置顶(横向条) + 机台表整行展开，用满卡片宽度避免横向滚动；汇总栏贴底 */
+            .container > .card:nth-child(2) .form-grid { flex: 1; display: flex; flex-direction: column; }
+            .container > .card:nth-child(2) .machine-layout { flex-direction: column; margin-bottom: 12px; }
+            .container > .card:nth-child(2) .mother-roll-panel {
+                width: 100%; flex-direction: row; align-items: center; justify-content: center;
+                gap: 14px; padding: 12px 18px;
+            }
+            .container > .card:nth-child(2) .mother-roll-panel label { margin-bottom: 0; }
+            .container > .card:nth-child(2) .mother-roll-panel .mother-roll-highlight { width: auto; min-width: 300px; }
+            .container > .card:nth-child(2) .summary-bar { margin-top: auto; }
+        }
+        /* 超大屏：放宽容器，利用横向空间 */
+        @media (min-width: 1600px) {
+            .container { max-width: 1680px; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- 顶部固定导航 -->
+<header class="top-nav">
+    <div class="logo">
+        <span class="mark"><svg class="ic" data-icon="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg></span>
+        <span>涂布小卷切分批号管理系统<small>COATING · SLITTING BATCH CONTROL</small></span>
+    </div>
+        <div class="actions">
+            <span class="save-status" id="saveStatus" aria-live="polite"><span class="dot"></span><span class="save-status-text" id="saveStatusText">已就绪</span></span>
+            <button class="btn-outline" onclick="openHelp()"><svg class="ic" data-icon="book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>使用说明</button>
+        <button class="btn-success" onclick="saveData()"><svg class="ic" data-icon="save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>保存记录</button>
+        <button class="btn-warning" onclick="exportExcel()"><svg class="ic" data-icon="download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>导出 Excel</button>
+        <button class="btn-gray" onclick="openHistory()"><svg class="ic" data-icon="history" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>历史记录</button>
+        <button class="btn-danger" onclick="window.print()"><svg class="ic" data-icon="print" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>打印</button>
+    </div>
+</header>
+
+<div class="container">
+    <!-- 1. 基础信息 -->
+    <div class="card">
+        <div class="card-header">
+            <div class="title-wrap">
+                <span class="step-badge">01</span>
+                <span class="ttl">涂布生产工单信息</span>
+            </div>
+            <div style="display: flex; gap:10px; flex-wrap: wrap;">
+                <button class="btn-outline" onclick="downloadTemplate()"><svg class="ic" data-icon="doc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>下载工单模板</button>
+                <button class="btn-outline" onclick="document.getElementById('woImportFile').click()"><svg class="ic" data-icon="upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>导入母卷工单库</button>
+                <input type="file" id="woImportFile" style="display: none;" accept=".xlsx, .xls, .csv" onchange="importWorkOrderLibrary(event)">
+                <button class="btn-outline" onclick="clearData()"><svg class="ic" data-icon="trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>清空页面数据</button>
+            </div>
+        </div>
+
+        <div class="rule-hint">
+            <strong>母卷批号规则：</strong> YMC + 年月日(YYMMDD) + 班次(A/B) + 机号(1) + 流水号(01-99) &nbsp;|&nbsp; 示例：<code>YMC261029A108</code>
+        </div>
+
+        <!-- 第一行 -->
+        <div class="grid-aligned grid-mother-bg">
+            <div class="form-group">
+                <label>下单日期</label>
+                <input type="date" id="orderDate" onchange="autoGenerateMotherRoll(); checkDateOrder()">
+            </div>
+            <div class="form-group">
+                <label>班次</label>
+                <input type="text" id="shiftCode" value="A" title="格式：A / B" onchange="autoGenerateMotherRoll()" oninput="validateField('shiftCode')">
+            </div>
+            <div class="form-group">
+                <label>生产机台</label>
+                <input type="text" id="machineNo" value="1" title="生产机台编号" onchange="autoGenerateMotherRoll()" oninput="validateField('machineNo')">
+            </div>
+            <div class="form-group">
+                <label>流水号</label>
+                <input type="text" id="serialNo" value="08" title="流水号 01-99" onchange="autoGenerateMotherRoll()" oninput="validateField('serialNo')">
+            </div>
+            <div class="form-group">
+                <label style="color:var(--accent-deep);">母卷批号</label>
+                <input type="text" id="motherRollNo" class="mother-roll-highlight" title="可手动修改" oninput="syncMotherRollDisplay()">
+            </div>
+        </div>
+
+        <!-- 第二行 -->
+        <div class="grid-aligned">
+            <div class="form-group">
+                <label style="color:var(--accent-deep);">工单号</label>
+                <input type="text" id="workOrderNo" list="woList" value="YMC2610-039-2X" title="支持从工单库下拉选择" onchange="fillWorkOrderInfo()">
+                <datalist id="woList"></datalist>
+            </div>
+            <div class="form-group"><label>出货数量</label><input type="text" id="shipQty" value="200m"></div>
+            <div class="form-group"><label>生产数量</label><input type="text" id="prodQty" value="200m" class="num" title="用于与生产数量核对差异"></div>
+            <div class="form-group"><label>预计完工工时</label><input type="date" id="finishTime" onchange="checkDateOrder()"></div>
+            <div class="form-group"><label>预计交货日期</label><input type="date" id="deliveryDate" onchange="checkDateOrder()"><div class="field-hint" id="dateOrderHint"></div></div>
+        </div>
+
+        <!-- 规格区 -->
+        <div class="grid-spec">
+            <div class="form-group"><label>成品代码</label><input type="text" id="productCode" value="YS150-MH"></div>
+            <div class="form-group"><label>产品类别</label><input type="text" id="productType" value="车衣修复层"></div>
+            <div class="form-group"><label>上胶厚度(μm)</label><input type="text" id="topGlue" value="5" class="num"></div>
+            <div class="form-group"><label>外层厚度(μm)</label><input type="text" id="outerThick" value="75" class="num"></div>
+            <div class="form-group"><label>中层厚度(μm)</label><input type="text" id="midThick" value="178" class="num"></div>
+            <div class="form-group"><label>内层厚度(μm)</label><input type="text" id="innerThick" value="50" class="num"></div>
+            <div class="form-group"><label>宽度(mm)</label><input type="text" id="width" value="1520" class="num"></div>
+            <div class="form-group"><label>长度(m)</label><input type="text" id="length" value="200" class="num"></div>
+            <div class="form-group"><label>PET层数</label><input type="text" id="petLayers" value="3" class="num"></div>
+            <div class="form-group"><label>面积(m²)</label><input type="text" id="area" value="304" class="num"></div>
+            <div class="form-group"><label>熟化条件</label><input type="text" id="cureCond" value="45℃/72H"></div>
+            <div class="form-group"><label>等级</label><input type="text" id="grade" value="A"></div>
+        </div>
+    </div>
+
+    <!-- 2. 切分参数 -->
+    <div class="card is-primary">
+        <div class="card-header" style="margin-bottom: 12px;">
+            <div class="title-wrap">
+                <span class="step-badge">02</span>
+                <span class="ttl">切分参数与批号生成</span>
+            </div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <button class="btn-outline" onclick="openShiftModal()" style="border-color: var(--accent); color: var(--accent-deep); font-weight: 600;"><svg class="ic" data-icon="clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>预设班次</button>
+                <button class="btn-outline" onclick="openOperatorModal()" style="border-color: var(--accent); color: var(--accent-deep); font-weight: 600;"><svg class="ic" data-icon="users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>预设操作员</button>
+                <button class="btn-primary" onclick="addMachineRow()" style="font-weight: 600;"><svg class="ic" data-icon="plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>增加机台</button>
+            </div>
+        </div>
+
+        <div class="rule-hint warn">
+            <strong>小卷批号规则：</strong> 母卷批号 + "-" + 3位流水号(全局从001起) &nbsp;|&nbsp; 示例：<code>YMC261029A108-001</code>
+        </div>
+
+        <div class="form-grid" style="grid-template-columns: 1fr; gap: 10px;">
+            <div class="machine-layout">
+                <div class="mother-roll-panel">
+                    <label>当前母卷批号 (自动同步)</label>
+                    <input type="text" id="displayMotherRoll" readonly class="mother-roll-highlight" style="border-style:solid;">
+                </div>
+
+                <div class="machine-table-panel">
+                    <table class="machine-config-table">
+                        <thead>
+                            <tr>
+                <th width="8%">机台号</th>
+                <th width="9%">切分卷数</th>
+                <th width="9%">每卷米数(m)</th>
+                <th width="18%">切分日期</th>
+                <th width="15%">班次</th>
+                <th width="26%">操作员</th>
+                <th width="15%">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="machineConfigBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="summary-bar">
+                <div class="summary-text">
+                    <div>总卷数: <span id="totalQtyText" class="summary-highlight">0</span> 卷</div>
+                    <div>总米数: <span id="totalLengthText" class="summary-highlight">0</span> m</div>
+                    <div class="diff-warning" id="diffWarning">⚠️ 差异提示</div>
+                </div>
+                <button class="btn-primary cta-generate" id="genBtn" onclick="generateBatches()">
+                    <svg class="ic" data-icon="bolt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>一键生成批号
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. 明细列表 -->
+    <div class="card">
+        <div class="card-header">
+            <div class="title-wrap">
+                <span class="step-badge">03</span>
+                <span class="ttl">切分批号明细</span>
+                <span class="sub">点击单元格即可修改，支持勾选品检结果</span>
+            </div>
+        </div>
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th width="7%">流水号</th>
+                        <th width="12%">物料号</th>
+                        <th width="16%">小卷批号</th>
+                        <th width="10%">日期</th>
+                        <th width="6%">班次</th>
+                        <th width="8%">切分机号</th>
+                        <th width="7%">米数</th>
+                        <th width="18%">
+                            品检结果
+                            <div class="batch-actions">
+                                <button class="btn-success" onclick="batchQC('pass')"><svg class="ic" data-icon="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>全合格</button>
+                                <button class="btn-danger" onclick="batchQC('fail')"><svg class="ic" data-icon="x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>全不合格</button>
+                                <button class="btn-gray" onclick="batchQC(null)"><svg class="ic" data-icon="refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>清空</button>
+                            </div>
+                        </th>
+                        <th width="16%">
+                            检验员
+                            <div class="batch-actions">
+                                <button class="btn-primary" onclick="batchInspector()"><svg class="ic" data-icon="users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>批量填入</button>
+                            </div>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ================= 预设操作员弹窗 ================= -->
+<div class="modal-overlay" id="operatorModal">
+    <div class="modal-content">
+        <button class="close-btn" onclick="closeModal('operatorModal')"><svg class="ic" data-icon="close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg></button>
+        <h2><svg class="ic" data-icon="users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>管理操作员预设</h2>
+        <div style="display: flex; gap: 10px; margin-top: 16px;">
+            <input type="text" id="newOperatorName" placeholder="输入操作员姓名" style="padding: 9px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); flex: 1; font-family: var(--sans); font-size: 14px;">
+            <button class="btn-primary" onclick="addPreset('operator')"><svg class="ic" data-icon="plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>添加</button>
+        </div>
+        <div class="preset-list" id="operatorListBox"></div>
+    </div>
+</div>
+
+<!-- ================= 预设班次弹窗 ================= -->
+<div class="modal-overlay" id="shiftModal">
+    <div class="modal-content">
+        <button class="close-btn" onclick="closeModal('shiftModal')"><svg class="ic" data-icon="close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg></button>
+        <h2><svg class="ic" data-icon="clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>管理班次预设</h2>
+        <div style="display: flex; gap: 10px; margin-top: 16px;">
+            <input type="text" id="newShiftName" placeholder="输入班次 (如: A班)" style="padding: 9px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); flex: 1; font-family: var(--sans); font-size: 14px;">
+            <button class="btn-primary" onclick="addPreset('shift')"><svg class="ic" data-icon="plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>添加</button>
+        </div>
+        <div class="preset-list" id="shiftListBox"></div>
+    </div>
+</div>
+
+<!-- ================= 历史记录弹窗 ================= -->
+<div class="modal-overlay" id="historyModal">
+    <div class="modal-content" style="width: 900px;">
+        <button class="close-btn" onclick="closeModal('historyModal')"><svg class="ic" data-icon="close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg></button>
+        <h2><svg class="ic" data-icon="history" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>历史保存记录</h2>
+        <div style="display: flex; gap:10px; margin: 16px 0;">
+            <input type="text" id="searchHistory" placeholder="输入母卷批号或工单号搜索..." oninput="renderHistory()" style="padding: 9px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); flex:1; font-family: var(--sans); font-size: 14px;">
+            <button class="btn-danger" onclick="clearHistory()"><svg class="ic" data-icon="trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>清空全部历史</button>
+        </div>
+        <div style="max-height: 60vh; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px;">
+            <table class="history-table">
+                <thead>
+                    <tr>
+                        <th>保存时间</th>
+                        <th>工单号</th>
+                        <th>母卷批号</th>
+                        <th>总卷数</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="historyTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ================= 使用说明弹窗 ================= -->
+<div class="modal-overlay" id="helpModal">
+    <div class="modal-content">
+        <button class="close-btn" onclick="closeModal('helpModal')"><svg class="ic" data-icon="close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg></button>
+        <h2><svg class="ic" data-icon="book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>系统操作使用说明</h2>
+
+        <h3>1. 工单库维护与使用</h3>
+        <p>点击右上角的【下载工单模板】，在 Excel 中填好信息后，点击【导入母卷工单库】。导入后，在“工单号”输入框下拉选择，系统会自动填入所有规格信息。</p>
+
+        <h3>2. 预设管理 (班次/操作员)</h3>
+        <p>点击切分参数区右上角的【预设班次】和【预设操作员】，可提前把常用信息录入。录入后在表格中直接下拉选择即可。</p>
+
+        <h3>3. 批号生成与打勾</h3>
+        <p>填写好机台的卷数、米数、日期、班次和操作员后，点击【一键生成批号】。品质人员可以在明细表使用表头按钮一键批量登记合格状态。<br><strong>电脑端快捷键：</strong>按 <code style="background:#E6F2F1;color:#0B636B;padding:1px 6px;border-radius:5px;font-family:var(--mono);">Ctrl / ⌘ + Enter</code> 可直接生成批号。</p>
+
+        <h3>4. 打印与导出</h3>
+        <p>点击顶部【打印】即可生成标准的 A4 工单与条码标签；点击【导出 Excel】可下载含所有关联信息的表格。</p>
+    </div>
+</div>
+
+<!-- ================= 打印专用区域 ================= -->
+<div id="print-area">
+    <div class="page-break">
+        <div style="font-size: 14px; margin-bottom:5px;">涂布生产工单</div>
+        <table class="print-table">
+            <tr>
+                <td width="12%" class="bg-gray">工单号：</td><td width="38%" id="p_workOrderNo"></td>
+                <td width="15%" class="bg-gray">下单日期：</td><td width="35%" id="p_orderDate"></td>
+            </tr>
+            <tr>
+                <td class="bg-gray">出货数量：</td><td id="p_shipQty"></td>
+                <td class="bg-gray">预计完工工时：</td><td id="p_finishTime"></td>
+            </tr>
+            <tr>
+                <td class="bg-gray">生产数量：</td><td id="p_prodQty"></td>
+                <td class="bg-gray">预计交货日期：</td><td id="p_deliveryDate"></td>
+            </tr>
+            <tr>
+                <td class="bg-gray">生产机台：</td><td id="p_machineNo"></td>
+                <td class="bg-gray">母卷批号：</td><td class="bold" id="p_motherRollNo" style="font-size: 14px;"></td>
+            </tr>
+        </table>
+
+        <table class="print-table" style="margin-top: -1px;">
+            <tr class="bg-gray">
+                <td rowspan="2" width="8%" style="vertical-align: middle;">成品代码</td>
+                <td rowspan="2" width="12%" style="vertical-align: middle;">产品类别</td>
+                <td width="7%">上胶厚度<br>(μm)</td>
+                <td width="7%">外层厚度<br>(μm)</td>
+                <td width="7%">中层厚度<br>(μm)</td>
+                <td width="7%">内层厚度<br>(μm)</td>
+                <td width="7%">宽度<br>(mm)</td>
+                <td width="7%">长度<br>(m)</td>
+                <td width="7%">PET层数</td>
+                <td width="7%">面积(m²)</td>
+                <td width="12%">熟化条件</td>
+                <td width="5%">等级</td>
+            </tr>
+            <tr>
+                <td id="p_topGlue"></td><td id="p_outerThick"></td><td id="p_midThick"></td><td id="p_innerThick"></td>
+                <td id="p_width"></td><td id="p_length"></td><td id="p_petLayers"></td><td id="p_area"></td>
+                <td id="p_cureCond"></td><td id="p_grade"></td>
+            </tr>
+            <tr>
+                <td class="bg-gray">成品代码</td>
+                <td colspan="2" id="p_productCode" style="text-align: left; padding-left:10px;"></td>
+                <td class="bg-gray">产品类别</td>
+                <td colspan="8" id="p_productType" style="text-align: left; padding-left:10px;"></td>
+            </tr>
+        </table>
+
+        <table class="print-table" style="margin-top: -1px;">
+            <tr>
+                <td width="8%" class="bg-gray" style="vertical-align: middle;">客户要求</td>
+                <td class="text-left" style="padding: 10px;">
+                    <div>1、生产需求参照工艺标准</div>
+                    <div style="margin-top: 5px;">2、生产请严格按工艺生产执行。生产时请品质，技术、工艺现场确认，减少不良</div>
+                </td>
+            </tr>
+        </table>
+
+        <div style="margin-top: 20px;">
+            <div style="font-family: SimSun; font-size: 14px; font-weight: bold; text-align: center; margin-bottom: 5px;">切分批号明细表</div>
+            <div style="font-family: SimSun; font-size: 12px; text-align: left; margin-bottom: 5px;">
+                切分机台: <span id="p_cutMachineNo2"></span> | 切分日期: <span id="p_date2"></span> | 母卷批号: <span class="bold" id="p_motherRollNo2"></span> | 操作员: <span id="p_cutOperator"></span>
+            </div>
+            <table class="print-table">
+                <thead>
+                    <tr class="bg-gray">
+                        <th width="7%">流水号</th>
+                        <th width="12%">物料号</th>
+                        <th width="16%">小卷批号</th>
+                        <th width="10%">日期</th>
+                        <th width="6%">班次</th>
+                        <th width="8%">机号</th>
+                        <th width="7%">米数</th>
+                        <th width="18%">品检结果</th>
+                        <th width="16%">检验员</th>
+                    </tr>
+                </thead>
+                <tbody id="p_tableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div style="page-break-before: always;">
+        <div class="label-grid" id="printLabels"></div>
+    </div>
+</div>
+
+<script>
+    // ============ 图标库 ============
+    const ICONS = {
+        logo: '<path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="M3 13l9 5 9-5"/>',
+        book: '<path d="M5 4h11a2 2 0 0 1 2 2v14H7a2 2 0 0 0-2 2V4Z"/><path d="M5 4v18"/><path d="M9 8h7M9 12h7"/>',
+        save: '<path d="M5 3h11l4 4v14H5V3Z"/><path d="M8 3v6h8V3"/><path d="M8 21v-7h8v7"/>',
+        download: '<path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M4 19h16"/>',
+        history: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l4 2"/>',
+        print: '<path d="M7 8V3h10v5"/><path d="M5 8h14v8h-4v5H9v-5H5V8Z"/><path d="M17 13h.01"/>',
+        trash: '<path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/>',
+        doc: '<path d="M7 3h7l5 5v13H7V3Z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h6"/>',
+        upload: '<path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M4 19h16"/>',
+        clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+        users: '<circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 5a3.5 3.5 0 0 1 0 7"/><path d="M18 20a6 6 0 0 0-3-5"/>',
+        plus: '<path d="M12 5v14M5 12h14"/>',
+        close: '<path d="M6 6l12 12M18 6 6 18"/>',
+        check: '<path d="M5 12l5 5L20 6"/>',
+        x: '<path d="M6 6l12 12M18 6 6 18"/>',
+        refresh: '<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/>',
+        bolt: '<path d="M13 3 4 14h7l-1 7 9-11h-7l1-7Z"/>',
+        warning: '<path d="M12 4 2 20h20L12 4Z"/><path d="M12 10v5M12 18h.01"/>',
+        info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>'
+    };
+    function fillIcons() {
+        document.querySelectorAll('svg[data-icon]').forEach(s => { s.innerHTML = ICONS[s.dataset.icon] || ''; });
+    }
+    function ic(name) {
+        return `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ''}</svg>`;
+    }
+    function prefersReduced() { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+
+    // ============ Toast ============
+    function toast(msg, type = 'info') {
+        let wrap = document.getElementById('toastWrap');
+        if (!wrap) { wrap = document.createElement('div'); wrap.className = 'toast-wrap'; wrap.id = 'toastWrap'; document.body.appendChild(wrap); }
+        const t = document.createElement('div');
+        t.className = 'toast ' + (type || 'info');
+        const iconMap = { success: 'check', error: 'warning', warn: 'warning', info: 'info' };
+        t.innerHTML = ic(iconMap[type] || 'info') + '<span>' + msg + '</span>';
+        wrap.appendChild(t);
+        setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 300); }, 2600);
+    }
+
+    // ============ 通用模态管理（ESC/背景关闭/滚动锁定/焦点陷阱） ============
+    let lastFocusedEl = null;
+    function openModalEl(el, focusSel) {
+        if (!el) return;
+        lastFocusedEl = document.activeElement;
+        el.style.display = 'flex';
+        document.body.classList.add('modal-open');
+        const target = focusSel ? el.querySelector(focusSel)
+            : (el.querySelector('input, select, textarea') || el.querySelector('button, [tabindex]'));
+        if (target) setTimeout(() => { try { target.focus(); } catch (e) {} }, 30);
+    }
+    function closeModalEl(el) {
+        if (!el) return;
+        el.style.display = 'none';
+        document.body.classList.remove('modal-open');
+        if (lastFocusedEl && document.contains(lastFocusedEl)) { try { lastFocusedEl.focus(); } catch (e) {} }
+        lastFocusedEl = null;
+    }
+    function trapFocus(e, container) {
+        const f = Array.from(container.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'))
+            .filter(x => !x.disabled && x.offsetParent !== null);
+        if (!f.length) return;
+        const first = f[0], last = f[f.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+    document.addEventListener('click', (e) => {
+        const t = e.target;
+        if (t.classList && t.classList.contains('modal-overlay') && t.id !== 'dialogOverlay') closeModalEl(t);
+    });
+    document.addEventListener('keydown', (e) => {
+        const openModals = Array.from(document.querySelectorAll('.modal-overlay')).filter(m => m.style.display === 'flex');
+        if (!openModals.length) return;
+        const top = openModals[openModals.length - 1];
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            if (top.id === 'dialogOverlay') resolveDialog(top.classList.contains('prompt') ? null : false);
+            else closeModalEl(top);
+        } else if (e.key === 'Tab') {
+            trapFocus(e, top);
+        }
+    });
+
+    // ============ 自定义对话框（替代原生 alert / confirm / prompt） ============
+    let _dialogResolve = null;
+    function getDialogEl() {
+        let ov = document.getElementById('dialogOverlay');
+        if (ov) return ov;
+        ov = document.createElement('div');
+        ov.className = 'modal-overlay';
+        ov.id = 'dialogOverlay';
+        ov.setAttribute('role', 'alertdialog');
+        ov.setAttribute('aria-modal', 'true');
+        ov.innerHTML = `
+          <div class="modal-content dialog-box">
+            <button class="close-btn" type="button" aria-label="关闭" data-dialog-close></button>
+            <h2 class="dialog-title"><span class="dialog-icon"></span><span class="dialog-title-text"></span></h2>
+            <p class="dialog-message lead"></p>
+            <div class="dialog-input-wrap" hidden><input type="text" class="dialog-input" id="dialogInput"></div>
+            <div class="dialog-actions"></div>
+          </div>`;
+        document.body.appendChild(ov);
+        ov.addEventListener('click', (e) => { if (e.target === ov) resolveDialog(false); });
+        ov.querySelector('[data-dialog-close]').addEventListener('click', () => resolveDialog(false));
+        return ov;
+    }
+    function resolveDialog(value) {
+        const ov = document.getElementById('dialogOverlay');
+        if (!ov || !_dialogResolve) return;
+        const r = _dialogResolve; _dialogResolve = null;
+        ov.style.display = 'none';
+        ov.classList.remove('prompt');
+        document.body.classList.remove('modal-open');
+        if (lastFocusedEl && document.contains(lastFocusedEl)) { try { lastFocusedEl.focus(); } catch (e) {} }
+        lastFocusedEl = null;
+        r(value);
+    }
+    function buildDialogActions(ov, buttons) {
+        const a = ov.querySelector('.dialog-actions'); a.innerHTML = '';
+        buttons.forEach(b => {
+            const btn = document.createElement('button');
+            btn.className = b.className; btn.textContent = b.text;
+            btn.onclick = () => b.onClick();
+            a.appendChild(btn);
+        });
+    }
+    function dialogAlert({ title = '提示', message = '', type = 'info' } = {}) {
+        return new Promise((resolve) => {
+            const ov = getDialogEl(); _dialogResolve = resolve;
+            ov.querySelector('.dialog-title-text').textContent = title;
+            ov.querySelector('.dialog-message').textContent = message;
+            const icon = ov.querySelector('.dialog-icon');
+            icon.className = 'dialog-icon ' + (type === 'error' ? 'danger' : type === 'warn' ? 'warn' : 'info');
+            icon.innerHTML = ic(type === 'error' || type === 'warn' ? 'warning' : 'info');
+            ov.querySelector('.dialog-input-wrap').hidden = true;
+            buildDialogActions(ov, [{ className: 'btn-primary', text: '我知道了', onClick: () => resolveDialog(true) }]);
+            openModalEl(ov, '.dialog-actions button');
+        });
+    }
+    function dialogConfirm({ title = '确认操作', message = '', confirmText = '确定', cancelText = '取消', danger = false } = {}) {
+        return new Promise((resolve) => {
+            const ov = getDialogEl(); _dialogResolve = resolve;
+            ov.querySelector('.dialog-title-text').textContent = title;
+            ov.querySelector('.dialog-message').textContent = message;
+            const icon = ov.querySelector('.dialog-icon');
+            icon.className = 'dialog-icon ' + (danger ? 'danger' : 'warn');
+            icon.innerHTML = ic(danger ? 'warning' : 'info');
+            ov.querySelector('.dialog-input-wrap').hidden = true;
+            buildDialogActions(ov, [
+                { className: 'btn-outline', text: cancelText, onClick: () => resolveDialog(false) },
+                { className: danger ? 'btn-danger' : 'btn-primary', text: confirmText, onClick: () => resolveDialog(true) }
+            ]);
+            openModalEl(ov, danger ? '.dialog-actions button.btn-danger' : '.dialog-actions button.btn-primary');
+        });
+    }
+    function dialogPrompt({ title = '输入', message = '', value = '', placeholder = '' } = {}) {
+        return new Promise((resolve) => {
+            const ov = getDialogEl(); _dialogResolve = resolve;
+            ov.classList.add('prompt');
+            ov.querySelector('.dialog-title-text').textContent = title;
+            ov.querySelector('.dialog-message').textContent = message;
+            const icon = ov.querySelector('.dialog-icon');
+            icon.className = 'dialog-icon info'; icon.innerHTML = ic('info');
+            const wrap = ov.querySelector('.dialog-input-wrap'); wrap.hidden = false;
+            const input = ov.querySelector('#dialogInput');
+            input.value = value || ''; input.placeholder = placeholder || '';
+            buildDialogActions(ov, [
+                { className: 'btn-outline', text: '取消', onClick: () => resolveDialog(null) },
+                { className: 'btn-primary', text: '确定', onClick: () => resolveDialog(input.value) }
+            ]);
+            openModalEl(ov, '#dialogInput');
+            input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); resolveDialog(input.value); } }, { once: true });
+        });
+    }
+
+    // ============ 表单内联校验 ============
+    const FIELD_RULES = {
+        serialNo: { validate: v => /^\d{1,2}$/.test(v) && +v >= 1 && +v <= 99, msg: '流水号应为 01–99 的数字' },
+        shiftCode: { validate: v => /^[AB]$/i.test((v || '').trim()), msg: '班次仅支持 A 或 B' },
+        machineNo: { validate: v => /^\d{1,2}$/.test((v || '').trim()) && +v >= 1, msg: '机台号应为正整数' }
+    };
+    function showFieldError(id, msg) {
+        const el = document.getElementById(id); if (!el) return;
+        el.classList.add('input-error'); el.setAttribute('aria-invalid', 'true');
+        let m = el.parentNode.querySelector('.field-error-msg');
+        if (!m) {
+            m = document.createElement('div'); m.className = 'field-error-msg';
+            m.setAttribute('role', 'alert'); m.setAttribute('aria-live', 'polite');
+            el.parentNode.appendChild(m);
+        }
+        m.textContent = msg;
+    }
+    function clearFieldError(id) {
+        const el = document.getElementById(id); if (!el) return;
+        el.classList.remove('input-error'); el.removeAttribute('aria-invalid');
+        const m = el.parentNode.querySelector('.field-error-msg'); if (m) m.remove();
+    }
+    function validateField(id) {
+        const rule = FIELD_RULES[id]; if (!rule) return true;
+        const el = document.getElementById(id); const v = el ? el.value : '';
+        if (rule.validate(v)) { clearFieldError(id); return true; }
+        showFieldError(id, rule.msg); return false;
+    }
+    function validateCoreFields() {
+        let ok = true; Object.keys(FIELD_RULES).forEach(id => { if (!validateField(id)) ok = false; }); return ok;
+    }
+
+    // ============ 保存状态指示 ============
+    let dirty = false;
+    function setDirty(state) {
+        dirty = state;
+        const el = document.getElementById('saveStatus'), txt = document.getElementById('saveStatusText');
+        if (!el) return;
+        el.classList.remove('dirty', 'saved');
+        txt.textContent = state ? '有未保存改动' : '已就绪';
+        if (state) el.classList.add('dirty');
+    }
+    function markSaved() {
+        const el = document.getElementById('saveStatus'), txt = document.getElementById('saveStatusText');
+        if (!el) return;
+        el.classList.remove('dirty'); el.classList.add('saved'); txt.textContent = '✓ 已保存';
+        setTimeout(() => { el.classList.remove('saved'); txt.textContent = '已就绪'; }, 2500);
+    }
+
+    // ============ 数字滚动动画 ============
+    function formatNum(v) { return (Math.round(v * 10) / 10).toString(); }
+    function animateNumber(el, to) {
+        const from = parseFloat(el.dataset.val || '0') || 0;
+        el.dataset.val = to;
+        if (prefersReduced()) { el.textContent = formatNum(to); return; }
+        const dur = 480, start = performance.now();
+        function step(now) {
+            const t = Math.min(1, (now - start) / dur);
+            const e = 1 - Math.pow(1 - t, 3);
+            el.textContent = formatNum(from + (to - from) * e);
+            if (t < 1) requestAnimationFrame(step);
+            else el.textContent = formatNum(to);
+        }
+        requestAnimationFrame(step);
+    }
+    function pulseRoll(el) { el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); }
+
+    // ============ 按钮加载态 ============
+    function setBtnLoading(btn, on) {
+        if (!btn) return;
+        if (on) {
+            btn.classList.add('btn-loading');
+            btn.dataset.label = btn.innerHTML;
+            btn.innerHTML = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9"/></svg>生成中...';
+        } else {
+            btn.innerHTML = btn.dataset.label;
+            btn.classList.remove('btn-loading');
+        }
+    }
+
+    // ========== 动态加载 Excel 库 ==========
+    function ensureXLSX(callback) {
+        if (window.XLSX) return callback();
+        const cdns = [
+            'https://cdn.staticfile.org/xlsx/0.18.5/xlsx.full.min.js',
+            'https://cdn.bootcdn.net/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
+            'https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js'
+        ];
+        let index = 0;
+        function tryLoad() {
+            if (index >= cdns.length) {
+                dialogAlert({ title: '网络提示', message: '网络不佳，无法加载 Excel 高级组件，将降级使用 CSV 格式导出。', type: 'warn' });
+                return callback(true);
+            }
+            const script = document.createElement('script');
+            script.src = cdns[index];
+            script.onload = () => callback(false);
+            script.onerror = () => { index++; tryLoad(); };
+            document.head.appendChild(script);
+        }
+        tryLoad();
+    }
+
+    // ========== 初始化与工单联动 ==========
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('orderDate').value = today;
+    document.getElementById('finishTime').value = today;
+    document.getElementById('deliveryDate').value = today;
+
+    function autoGenerateMotherRoll() {
+        const dateVal = document.getElementById('orderDate').value;
+        const shift = document.getElementById('shiftCode').value || 'A';
+        const machine = document.getElementById('machineNo').value || '1';
+        const serial = document.getElementById('serialNo').value || '01';
+
+        if (dateVal) {
+            const yymmdd = dateVal.replace(/-/g, '').slice(2);
+            const batchNo = `YMC${yymmdd}${shift}${machine}${serial.padStart(2, '0')}`;
+            const mr = document.getElementById('motherRollNo');
+            const dm = document.getElementById('displayMotherRoll');
+            mr.value = batchNo;
+            dm.value = batchNo;
+            pulseRoll(mr); pulseRoll(dm);
+        }
+    }
+
+    function syncMotherRollDisplay() {
+        document.getElementById('displayMotherRoll').value = document.getElementById('motherRollNo').value;
+    }
+
+    // 日期顺序校验：下单 ≤ 完工 ≤ 交货
+    function checkDateOrder() {
+        const o = document.getElementById('orderDate').value;
+        const f = document.getElementById('finishTime').value;
+        const d = document.getElementById('deliveryDate').value;
+        const hint = document.getElementById('dateOrderHint');
+        let msg = '';
+        if (f && o && f < o) msg = '⚠️ 完工日期早于下单日期';
+        else if (d && f && d < f) msg = '⚠️ 交货日期早于完工日期';
+        else if (d && o && d < o) msg = '⚠️ 交货日期早于下单日期';
+        if (msg) { hint.textContent = msg; hint.className = 'field-hint warn'; }
+        else { hint.textContent = ''; hint.className = 'field-hint'; }
+    }
+
+    document.getElementById('prodQty').addEventListener('input', calculateSummary);
+
+    // ===== 工单库导入与下拉联动 =====
+    function downloadTemplate() {
+        const templateData = [{
+            "工单号": "YMC2610-039-2X", "下单日期": "2026-10-27", "出货数量": "200m", "生产数量": "200m",
+            "成品代码": "YS150-MH", "产品类别": "车衣修复层", "上胶厚度": "5", "外层厚度": "75",
+            "中层厚度": "178", "内层厚度": "50", "宽度": "1520", "长度": "200",
+            "PET层数": "3", "面积": "304", "熟化条件": "45℃/72H", "等级": "A"
+        }];
+        ensureXLSX((isFallback) => {
+            if (!isFallback) {
+                const ws = XLSX.utils.json_to_sheet(templateData);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "工单模板");
+                const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+                downloadBlob(new Blob([wbout], { type: 'application/octet-stream' }), "工单导入模板.xlsx");
+            } else {
+                exportCSV(templateData, "工单导入模板.csv");
+            }
+        });
+    }
+
+    function importWorkOrderLibrary(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        ensureXLSX((isFallback) => {
+            if (isFallback) return dialogAlert({ title: '组件未加载', message: 'Excel 解析组件未能加载，无法导入文件。', type: 'error' });
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+
+                if (json.length === 0) return dialogAlert({ title: '导入失败', message: '导入的表格没有数据！', type: 'error' });
+
+                let woLibrary = JSON.parse(localStorage.getItem('workOrderLibrary') || '[]');
+                let addedCount = 0;
+
+                json.forEach(row => {
+                    if (row['工单号']) {
+                        const existingIdx = woLibrary.findIndex(w => w['工单号'] === row['工单号']);
+                        if (existingIdx > -1) {
+                            woLibrary[existingIdx] = row;
+                        } else {
+                            woLibrary.push(row);
+                            addedCount++;
+                        }
+                    }
+                });
+
+                localStorage.setItem('workOrderLibrary', JSON.stringify(woLibrary));
+                renderWorkOrderList();
+                toast(`✅ 成功导入/更新工单库！新增 ${addedCount} 条记录。`, 'success');
+                event.target.value = '';
+            };
+            reader.readAsArrayBuffer(file);
+        });
+    }
+
+    function renderWorkOrderList() {
+        const woLibrary = JSON.parse(localStorage.getItem('workOrderLibrary') || '[]');
+        const dataList = document.getElementById('woList');
+        dataList.innerHTML = '';
+        woLibrary.forEach(wo => {
+            const option = document.createElement('option');
+            option.value = wo['工单号'];
+            dataList.appendChild(option);
+        });
+    }
+
+    function fillWorkOrderInfo() {
+        const woNo = document.getElementById('workOrderNo').value.trim();
+        if (!woNo) return;
+
+        const woLibrary = JSON.parse(localStorage.getItem('workOrderLibrary') || '[]');
+        const wo = woLibrary.find(w => w['工单号'] === woNo);
+
+        if (wo) {
+            document.getElementById('orderDate').value = wo['下单日期'] || document.getElementById('orderDate').value;
+            document.getElementById('shipQty').value = wo['出货数量'] || '';
+            document.getElementById('prodQty').value = wo['生产数量'] || '';
+            document.getElementById('productCode').value = wo['成品代码'] || '';
+            document.getElementById('productType').value = wo['产品类别'] || '';
+            document.getElementById('topGlue').value = wo['上胶厚度'] || '';
+            document.getElementById('outerThick').value = wo['外层厚度'] || '';
+            document.getElementById('midThick').value = wo['中层厚度'] || '';
+            document.getElementById('innerThick').value = wo['内层厚度'] || '';
+            document.getElementById('width').value = wo['宽度'] || '';
+            document.getElementById('length').value = wo['长度'] || '';
+            document.getElementById('petLayers').value = wo['PET层数'] || '';
+            document.getElementById('area').value = wo['面积'] || '';
+            document.getElementById('cureCond').value = wo['熟化条件'] || '';
+            document.getElementById('grade').value = wo['等级'] || '';
+
+            autoGenerateMotherRoll();
+            calculateSummary();
+        }
+    }
+    renderWorkOrderList();
+
+    // ========== 预设管理 (班次 & 操作员) ==========
+    let shiftList = JSON.parse(localStorage.getItem('shiftList') || '["A班", "B班", "C班"]');
+    let operatorList = JSON.parse(localStorage.getItem('operatorList') || '["张三", "李四", "王五"]');
+
+    function renderPresetDatalists() {
+        let shiftDatalist = document.getElementById('shiftDatalist');
+        if (!shiftDatalist) {
+            shiftDatalist = document.createElement('datalist');
+            shiftDatalist.id = 'shiftDatalist';
+            document.body.appendChild(shiftDatalist);
+        }
+        shiftDatalist.innerHTML = '';
+        shiftList.forEach(name => {
+            const option = document.createElement('option');
+            option.value = name;
+            shiftDatalist.appendChild(option);
+        });
+
+        let operatorDatalist = document.getElementById('operatorDatalist');
+        if (!operatorDatalist) {
+            operatorDatalist = document.createElement('datalist');
+            operatorDatalist.id = 'operatorDatalist';
+            document.body.appendChild(operatorDatalist);
+        }
+        operatorDatalist.innerHTML = '';
+        operatorList.forEach(name => {
+            const option = document.createElement('option');
+            option.value = name;
+            operatorDatalist.appendChild(option);
+        });
+    }
+    renderPresetDatalists();
+
+    function openShiftModal() {
+        renderPresetList('shift');
+        openModalEl(document.getElementById('shiftModal'), '#newShiftName');
+    }
+    function openOperatorModal() {
+        renderPresetList('operator');
+        openModalEl(document.getElementById('operatorModal'), '#newOperatorName');
+    }
+    function closeModal(modalId) {
+        closeModalEl(document.getElementById(modalId));
+    }
+    function renderPresetList(type) {
+        const listBox = type === 'shift' ? document.getElementById('shiftListBox') : document.getElementById('operatorListBox');
+        const list = type === 'shift' ? shiftList : operatorList;
+        listBox.innerHTML = '';
+        list.forEach((name, index) => {
+            const item = document.createElement('div');
+            item.className = 'preset-item';
+            item.innerHTML = `<span>${name}</span><button onclick="deletePreset('${type}', ${index})">${ic('close')}</button>`;
+            listBox.appendChild(item);
+        });
+    }
+    function addPreset(type) {
+        const input = document.getElementById(type === 'shift' ? 'newShiftName' : 'newOperatorName');
+        const name = input.value.trim();
+        let list = type === 'shift' ? shiftList : operatorList;
+
+        if (name && !list.includes(name)) {
+            list.push(name);
+            localStorage.setItem(type === 'shift' ? 'shiftList' : 'operatorList', JSON.stringify(list));
+            renderPresetList(type);
+            renderPresetDatalists();
+            renderMachineConfigs();
+            input.value = '';
+        }
+    }
+    function deletePreset(type, index) {
+        let list = type === 'shift' ? shiftList : operatorList;
+        list.splice(index, 1);
+        localStorage.setItem(type === 'shift' ? 'shiftList' : 'operatorList', JSON.stringify(list));
+        renderPresetList(type);
+        renderPresetDatalists();
+        renderMachineConfigs();
+    }
+
+    // ========== 动态多机台配置 ==========
+    let machineConfigs = [{
+        machineNo: '1', qty: '', length: '',
+        cutDate: '', cutShift: '', cutOperator: ''
+    }];
+
+    function renderMachineConfigs() {
+        const tbody = document.getElementById('machineConfigBody');
+        tbody.innerHTML = '';
+        machineConfigs.forEach((config, index) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><input type="text" class="table-input inline" value="${config.machineNo}" placeholder="1" oninput="updateMachineConfig(${index}, 'machineNo', this.value)"></td>
+                <td><input type="number" class="table-input inline num num-3" value="${config.qty}" min="1" placeholder="卷数" oninput="updateMachineConfig(${index}, 'qty', this.value)"></td>
+                <td><input type="number" class="table-input inline num num-3" value="${config.length}" min="1" placeholder="米数" oninput="updateMachineConfig(${index}, 'length', this.value)"></td>
+                <td><input type="date" class="table-input inline" value="${config.cutDate}" onchange="updateMachineConfig(${index}, 'cutDate', this.value)"></td>
+                <td><input type="text" class="table-input inline" list="shiftDatalist" value="${config.cutShift}" placeholder="班次" oninput="updateMachineConfig(${index}, 'cutShift', this.value)"></td>
+                <td>
+                    <input type="text" class="table-input inline" list="operatorDatalist" value="${config.cutOperator}" placeholder="姓名" oninput="updateMachineConfig(${index}, 'cutOperator', this.value)">
+                </td>
+                <td>
+                    ${machineConfigs.length > 1
+                        ? `<button class="btn-danger" style="padding: 5px 12px; font-size: 12px; width: 100%;" onclick="removeMachineConfig(${index})">删除</button>`
+                        : `<button class="btn-gray" style="padding: 5px 12px; font-size: 12px; opacity: 0.5; cursor: not-allowed; width: 100%;" disabled>默认</button>`}
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+        calculateSummary();
+    }
+
+    function addMachineRow() {
+        if (machineConfigs.length >= 4) { toast("最多支持 4 台机台同时切分！", 'warn'); return; }
+        machineConfigs.push({
+            machineNo: (machineConfigs.length + 1).toString(),
+            qty: '', length: '',
+            cutDate: '', cutShift: '', cutOperator: ''
+        });
+        renderMachineConfigs();
+        setDirty(true);
+    }
+
+    function removeMachineConfig(index) {
+        machineConfigs.splice(index, 1);
+        renderMachineConfigs();
+        setDirty(true);
+    }
+
+    function updateMachineConfig(index, key, value) {
+        machineConfigs[index][key] = value;
+        calculateSummary();
+        setDirty(true);
+    }
+
+    function calculateSummary() {
+        let totalQty = 0;
+        let totalLength = 0;
+
+        machineConfigs.forEach(config => {
+            const q = parseFloat(config.qty) || 0;
+            const l = parseFloat(config.length) || 0;
+            totalQty += q;
+            totalLength += (q * l);
+        });
+
+        animateNumber(document.getElementById('totalQtyText'), totalQty);
+        animateNumber(document.getElementById('totalLengthText'), totalLength);
+
+        const targetStr = document.getElementById('prodQty').value;
+        const targetLength = parseFloat(targetStr.replace(/[^\d.]/g, '')) || 0;
+        const warningEl = document.getElementById('diffWarning');
+
+        if (targetLength > 0 && Math.abs(totalLength - targetLength) > 0.1) {
+            warningEl.style.display = 'inline-block';
+            const diff = totalLength - targetLength;
+            if (diff > 0) {
+                warningEl.innerText = `⚠️ 比工单多了 ${diff.toFixed(1)}m`;
+            } else {
+                warningEl.innerText = `⚠️ 比工单少了 ${Math.abs(diff).toFixed(1)}m`;
+            }
+        } else {
+            warningEl.style.display = 'none';
+        }
+    }
+
+    renderMachineConfigs();
+
+    // ========== 生成批号 ==========
+    let globalData = [];
+
+    async function generateBatches() {
+        if (!validateCoreFields()) { toast('请先修正工单信息中红色标记的项', 'error'); return; }
+
+        const totalLenEl = document.getElementById('totalLengthText');
+        const totalLen = parseFloat(totalLenEl.dataset.val || totalLenEl.innerText || '0');
+        const targetStr = document.getElementById('prodQty').value;
+        const targetLen = parseFloat(targetStr.replace(/[^\d.]/g, '')) || 0;
+
+        if (targetLen > 0 && Math.abs(totalLen - targetLen) > 0.1) {
+            const diff = totalLen - targetLen;
+            const warnMsg = diff > 0 ? `多 ${diff.toFixed(1)}m` : `少 ${(targetLen - totalLen).toFixed(1)}m`;
+            const ok = await dialogConfirm({
+                title: '米数存在差异',
+                message: `当前机台总米数为 ${totalLen}m，与工单生产数量存在差异（${warnMsg}）。\n是否确认继续生成？`,
+                confirmText: '继续生成', cancelText: '返回修改'
+            });
+            if (!ok) return;
+        }
+
+        const motherRoll = document.getElementById('motherRollNo').value.trim();
+        const prodCode = document.getElementById('productCode').value;
+
+        if (!motherRoll) return dialogAlert({ title: '无法生成', message: '母卷批号不能为空！', type: 'error' });
+
+        const btn = document.getElementById('genBtn');
+        setBtnLoading(btn, true);
+
+        setTimeout(() => {
+            globalData = [];
+            let currentSeq = 1;
+            let hasValidConfig = false;
+
+            machineConfigs.forEach(config => {
+                const qty = parseInt(config.qty);
+                if (!qty || qty <= 0) return;
+                hasValidConfig = true;
+
+                const rowDate = config.cutDate ? config.cutDate.replace(/-/g, '.') : '';
+
+                for (let i = 1; i <= qty; i++) {
+                    const seq = currentSeq.toString().padStart(3, '0');
+                    const batchNo = `${motherRoll}-${seq}`;
+
+                    globalData.push({
+                        seq: seq,
+                        prodCode: prodCode,
+                        batchNo: batchNo,
+                        date: rowDate,
+                        shift: config.cutShift,
+                        cutMachine: config.machineNo,
+                        length: config.length,
+                        operator: config.cutOperator,
+                        qcResult: null,
+                        inspector: ''
+                    });
+                    currentSeq++;
+                }
+            });
+
+            setBtnLoading(btn, false);
+
+            if (!hasValidConfig) return dialogAlert({ title: '无法生成', message: '请至少输入一组有效的卷数和米数！', type: 'error' });
+
+            renderTable(true);
+            syncPrintData();
+            setDirty(true);
+            toast(`成功生成 ${globalData.length} 卷切分批号`, 'success');
+            document.querySelector('.data-table').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 380);
+    }
+
+    function renderTable(animate) {
+        const tbody = document.getElementById('tableBody');
+        tbody.innerHTML = '';
+
+        if (globalData.length === 0) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td colspan="9" class="empty-state-td">
+                <div class="empty-state">
+                    <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/><circle cx="19" cy="18" r="2.4"/></svg>
+                    <div class="empty-title">尚未生成切分批号</div>
+                    <div class="empty-desc">先在「切分参数与批号生成」中填写各机台的卷数与米数，<br>再点击 <code>一键生成批号</code> 即可在此查看明细。</div>
+                    <button class="btn-primary" onclick="document.querySelector('.summary-bar').scrollIntoView({behavior:'smooth'})">去填写切分参数</button>
+                </div>
+            </td>`;
+            tbody.appendChild(tr);
+            return;
+        }
+
+        globalData.forEach((row, index) => {
+            const tr = document.createElement('tr');
+            if (animate) {
+                tr.className = 'gen';
+                tr.style.animationDelay = Math.min(index * 22, 480) + 'ms';
+            }
+            tr.innerHTML = `
+                <td class="num">${row.seq}</td>
+                <td><input class="table-input" type="text" value="${row.prodCode}" onchange="updateData(${index}, 'prodCode', this.value)"></td>
+                <td><input class="table-input num" type="text" value="${row.batchNo}" onchange="updateData(${index}, 'batchNo', this.value)"></td>
+                <td><input class="table-input" type="text" value="${row.date}" onchange="updateData(${index}, 'date', this.value)"></td>
+                <td><input class="table-input" type="text" value="${row.shift}" onchange="updateData(${index}, 'shift', this.value)"></td>
+                <td><input class="table-input num" type="text" value="${row.cutMachine}" onchange="updateData(${index}, 'cutMachine', this.value)"></td>
+                <td><input class="table-input num" type="number" value="${row.length}" onchange="updateData(${index}, 'length', this.value)"></td>
+                <td>
+                    <div class="qc-group">
+                        <label class="qc-label pass">
+                            <input type="checkbox" ${row.qcResult === 'pass' ? 'checked' : ''} onchange="updateQC(${index}, 'pass', this.checked)"> 合格
+                        </label>
+                        <label class="qc-label fail">
+                            <input type="checkbox" ${row.qcResult === 'fail' ? 'checked' : ''} onchange="updateQC(${index}, 'fail', this.checked)"> 不合格
+                        </label>
+                    </div>
+                </td>
+                <td><input class="table-input" type="text" value="${row.inspector || ''}" placeholder="输入姓名" onchange="updateData(${index}, 'inspector', this.value)"></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function updateData(index, key, value) {
+        globalData[index][key] = value;
+        setDirty(true);
+    }
+
+    function updateQC(index, type, isChecked) {
+        const row = document.getElementById('tableBody').children[index];
+        const passCb = row ? row.querySelector('.qc-label.pass input') : null;
+        const failCb = row ? row.querySelector('.qc-label.fail input') : null;
+        if (isChecked) {
+            globalData[index].qcResult = type;
+            if (type === 'pass' && failCb) failCb.checked = false;
+            if (type === 'fail' && passCb) passCb.checked = false;
+        } else {
+            globalData[index].qcResult = null;
+        }
+        setDirty(true);
+        syncPrintData();
+    }
+
+    function batchQC(type) {
+        if (globalData.length === 0) return;
+        globalData.forEach(row => { row.qcResult = type; });
+        renderTable(false);
+        setDirty(true);
+        syncPrintData();
+    }
+
+    async function batchInspector() {
+        if (globalData.length === 0) return;
+        const name = await dialogPrompt({
+            title: '批量填入检验员',
+            message: '请输入检验员姓名（将批量填入所有行）：',
+            value: globalData[0].inspector || ''
+        });
+        if (name !== null && name !== undefined) {
+            const n = name.trim();
+            if (n) { globalData.forEach(row => row.inspector = n); renderTable(false); setDirty(true); syncPrintData(); }
+        }
+    }
+
+    // ========== 打印同步 ==========
+    function syncPrintData() {
+        document.getElementById('p_workOrderNo').innerText = document.getElementById('workOrderNo').value;
+        document.getElementById('p_orderDate').innerText = document.getElementById('orderDate').value.replace(/-/g, '.');
+        document.getElementById('p_shipQty').innerText = document.getElementById('shipQty').value;
+        document.getElementById('p_finishTime').innerText = document.getElementById('finishTime').value.replace(/-/g, '.');
+        document.getElementById('p_prodQty').innerText = document.getElementById('prodQty').value;
+        document.getElementById('p_deliveryDate').innerText = document.getElementById('deliveryDate').value.replace(/-/g, '.');
+        document.getElementById('p_machineNo').innerText = document.getElementById('machineNo').value + '#';
+
+        const mrNo = document.getElementById('motherRollNo').value;
+        document.getElementById('p_motherRollNo').innerText = mrNo;
+        document.getElementById('p_motherRollNo2').innerText = mrNo;
+
+        document.getElementById('p_productCode').innerText = document.getElementById('productCode').value;
+        document.getElementById('p_productType').innerText = document.getElementById('productType').value;
+        document.getElementById('p_topGlue').innerText = document.getElementById('topGlue').value;
+        document.getElementById('p_outerThick').innerText = document.getElementById('outerThick').value;
+        document.getElementById('p_midThick').innerText = document.getElementById('midThick').value;
+        document.getElementById('p_innerThick').innerText = document.getElementById('innerThick').value;
+        document.getElementById('p_width').innerText = document.getElementById('width').value;
+        document.getElementById('p_length').innerText = document.getElementById('length').value;
+        document.getElementById('p_petLayers').innerText = document.getElementById('petLayers').value;
+        document.getElementById('p_area').innerText = document.getElementById('area').value;
+        document.getElementById('p_cureCond').innerText = document.getElementById('cureCond').value;
+        document.getElementById('p_grade').innerText = document.getElementById('grade').value;
+
+        const machinesSet = new Set(globalData.map(d => d.cutMachine));
+        document.getElementById('p_cutMachineNo2').innerText = Array.from(machinesSet).join('、');
+        document.getElementById('p_date2').innerText = globalData[0] ? (globalData[0].date || '-') : '-';
+        document.getElementById('p_cutOperator').innerText = globalData[0] ? (globalData[0].operator || '-') : '-';
+
+        const pTbody = document.getElementById('p_tableBody');
+        pTbody.innerHTML = '';
+
+        globalData.forEach(row => {
+            let qcStr = '☐合格 &nbsp; ☐不合格';
+            if (row.qcResult === 'pass') qcStr = '☑合格 &nbsp; ☐不合格';
+            if (row.qcResult === 'fail') qcStr = '☐合格 &nbsp; ☑不合格';
+
+            const pTr = document.createElement('tr');
+            pTr.innerHTML = `
+                <td>${row.seq}</td>
+                <td>${row.prodCode}</td>
+                <td>${row.batchNo}</td>
+                <td>${row.date || '-'}</td>
+                <td>${row.shift || '-'}</td>
+                <td>${row.cutMachine}</td>
+                <td>${row.length}m</td>
+                <td>${qcStr}</td>
+                <td>${row.inspector || ''}</td>
+            `;
+            pTbody.appendChild(pTr);
+        });
+
+        generateLabels();
+    }
+
+    function generateLabels() {
+        const wrap = document.getElementById('printLabels');
+        wrap.innerHTML = '';
+
+        globalData.forEach((row, i) => {
+            const div = document.createElement('div');
+            div.className = 'print-label';
+
+            const barcodeId = `bc_${i}`;
+            const qrcodeId = `qr_${i}`;
+
+            div.innerHTML = `
+                <div class="info-row">
+                    <span>母卷: ${document.getElementById('motherRollNo').value}</span>
+                    <span>${row.date || '-'}</span>
+                </div>
+                <div class="batch-no">${row.batchNo}</div>
+                <div class="info-row">
+                    <span>${row.prodCode}</span>
+                    <span>${row.length}m</span>
+                    <span>${row.shift || ''} ${row.cutMachine}#</span>
+                </div>
+                <div class="barcode-box">
+                    <svg id="${barcodeId}"></svg>
+                    <div id="${qrcodeId}"></div>
+                </div>
+            `;
+            wrap.appendChild(div);
+
+            setTimeout(() => {
+                try {
+                    JsBarcode(`#${barcodeId}`, row.batchNo, { format: "CODE128", width: 1, height: 25, displayValue: false, margin: 0 });
+                    new QRCode(document.getElementById(qrcodeId), { text: row.batchNo, width: 24, height: 24, correctLevel: QRCode.CorrectLevel.L });
+                } catch (e) { }
+            }, 10);
+        });
+    }
+
+    window.onbeforeprint = function () {
+        if (globalData.length === 0) {
+            toast("请先生成切分批号数据，再执行打印。", 'warn');
+            return;
+        }
+        syncPrintData();
+    };
+
+    // ========== 数据存储与历史页面 ==========
+    function saveData() {
+        if (globalData.length === 0) return dialogAlert({ title: '无法保存', message: '当前没有可保存的数据，请先生成切分批号。', type: 'warn' });
+
+        const woInfo = getWorkOrderInfo();
+        const currentRecord = {
+            time: new Date().toLocaleString(),
+            workOrder: woInfo["工单号"],
+            motherRoll: woInfo["母卷批号"],
+            woInfo: woInfo,
+            machineConfigs: JSON.parse(JSON.stringify(machineConfigs)),
+            data: globalData
+        };
+
+        let history = JSON.parse(localStorage.getItem('batchHistory') || '[]');
+        history.push(currentRecord);
+        localStorage.setItem('batchHistory', JSON.stringify(history));
+        markSaved();
+        toast("✅ 当前工单及明细已保存至历史记录！", 'success');
+    }
+
+    function openHistory() {
+        renderHistory();
+        openModalEl(document.getElementById('historyModal'), '#searchHistory');
+    }
+
+    function renderHistory() {
+        const history = JSON.parse(localStorage.getItem('batchHistory') || '[]');
+        const searchKey = document.getElementById('searchHistory').value.trim().toLowerCase();
+        const tbody = document.getElementById('historyTableBody');
+        tbody.innerHTML = '';
+
+        const filtered = history.slice().reverse().filter(r =>
+            r.motherRoll.toLowerCase().includes(searchKey) ||
+            r.workOrder.toLowerCase().includes(searchKey)
+        );
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#94a3b8; padding:20px;">暂无相关数据</td></tr>`;
+            return;
+        }
+
+        filtered.forEach((record, index) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${record.time}</td>
+                <td>${record.workOrder}</td>
+                <td>${record.motherRoll}</td>
+                <td>${record.data.length} 卷</td>
+                <td>
+                    <button class="btn-primary" style="padding: 5px 12px; font-size: 12px;" onclick="loadHistory(${history.length - 1 - index})">${ic('download')}载入</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    async function loadHistory(realIndex) {
+        const ok = await dialogConfirm({ title: '载入历史记录', message: '载入历史记录将覆盖当前页面未保存的数据，是否继续？', confirmText: '载入', danger: true });
+        if (!ok) return;
+
+        const history = JSON.parse(localStorage.getItem('batchHistory') || '[]');
+        const record = history[realIndex];
+
+        if (record) {
+            const wo = record.woInfo || {};
+            const set = (id, key) => { const el = document.getElementById(id); if (el) el.value = wo[key] || ''; };
+            set('workOrderNo', '工单号');
+            set('motherRollNo', '母卷批号');
+            set('displayMotherRoll', '母卷批号');
+            set('orderDate', '下单日期');
+            set('shiftCode', '班次');
+            set('machineNo', '生产机台');
+            set('serialNo', '流水号');
+            set('shipQty', '出货数量');
+            set('prodQty', '生产数量');
+            set('finishTime', '预计完工工时');
+            set('deliveryDate', '预计交货日期');
+            set('productCode', '成品代码');
+            set('productType', '产品类别');
+            set('topGlue', '上胶厚度');
+            set('outerThick', '外层厚度');
+            set('midThick', '中层厚度');
+            set('innerThick', '内层厚度');
+            set('width', '宽度');
+            set('length', '长度');
+            set('petLayers', 'PET层数');
+            set('area', '面积');
+            set('cureCond', '熟化条件');
+            set('grade', '等级');
+
+            if (record.machineConfigs && record.machineConfigs.length) {
+                machineConfigs = JSON.parse(JSON.stringify(record.machineConfigs));
+                renderMachineConfigs();
+            } else {
+                calculateSummary();
+            }
+
+            globalData = JSON.parse(JSON.stringify(record.data));
+            renderTable(false);
+            syncPrintData();
+            setDirty(false);
+            checkDateOrder();
+            closeModal('historyModal');
+            toast("✅ 历史记录已成功载入当前页面！", 'success');
+        }
+    }
+
+    async function clearHistory() {
+        const ok = await dialogConfirm({ title: '清空历史记录', message: '⚠️ 警告：确定要清空所有历史保存记录吗？此操作不可恢复！', confirmText: '确认清空', danger: true });
+        if (ok) {
+            localStorage.removeItem('batchHistory');
+            renderHistory();
+        }
+    }
+
+    // ========== 导出与工具 ==========
+    function getWorkOrderInfo() {
+        return {
+            "工单号": document.getElementById('workOrderNo').value,
+            "母卷批号": document.getElementById('motherRollNo').value,
+            "下单日期": document.getElementById('orderDate').value,
+            "班次": document.getElementById('shiftCode').value,
+            "生产机台": document.getElementById('machineNo').value,
+            "流水号": document.getElementById('serialNo').value,
+            "预计完工工时": document.getElementById('finishTime').value,
+            "预计交货日期": document.getElementById('deliveryDate').value,
+            "出货数量": document.getElementById('shipQty').value,
+            "生产数量": document.getElementById('prodQty').value,
+            "成品代码": document.getElementById('productCode').value,
+            "产品类别": document.getElementById('productType').value,
+            "上胶厚度": document.getElementById('topGlue').value,
+            "外层厚度": document.getElementById('outerThick').value,
+            "中层厚度": document.getElementById('midThick').value,
+            "内层厚度": document.getElementById('innerThick').value,
+            "宽度": document.getElementById('width').value,
+            "长度": document.getElementById('length').value,
+            "PET层数": document.getElementById('petLayers').value,
+            "面积": document.getElementById('area').value,
+            "熟化条件": document.getElementById('cureCond').value,
+            "等级": document.getElementById('grade').value
+        };
+    }
+
+    function exportExcel() {
+        if (globalData.length === 0) return dialogAlert({ title: '无法导出', message: '当前没有可导出的数据，请先生成切分批号。', type: 'warn' });
+
+        const woInfo = getWorkOrderInfo();
+        const exportData = globalData.map(row => ({
+            ...woInfo,
+            "流水号": row.seq,
+            "小卷批号": row.batchNo,
+            "切分日期": row.date,
+            "切分班次": row.shift,
+            "切分机号": row.cutMachine,
+            "米数": row.length,
+            "切分操作员": row.operator || '',
+            "品检结果": row.qcResult === 'pass' ? '合格' : (row.qcResult === 'fail' ? '不合格' : ''),
+            "检验员": row.inspector || ''
+        }));
+
+        ensureXLSX((isFallback) => {
+            if (isFallback) {
+                exportCSV(exportData, `切分数据_${document.getElementById('motherRollNo').value}_${new Date().getTime()}.csv`);
+                return;
+            }
+            try {
+                const ws = XLSX.utils.json_to_sheet(exportData);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "切分明细");
+                const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+                downloadBlob(new Blob([wbout], { type: 'application/octet-stream' }), `切分数据_${document.getElementById('motherRollNo').value}_${new Date().getTime()}.xlsx`);
+            } catch (e) {
+                dialogAlert({ title: '导出提示', message: '导出组件生成失败，正在切换到备用 CSV 下载方式…', type: 'warn' });
+                exportCSV(exportData, `切分数据_${document.getElementById('motherRollNo').value}_${new Date().getTime()}.csv`);
+            }
+        });
+    }
+
+    function downloadBlob(blob, fileName) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = fileName;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+    }
+
+    function exportCSV(data, fileName) {
+        if (data.length === 0) return;
+        const headers = Object.keys(data[0]);
+        const rows = data.map(obj => headers.map(h => `"${obj[h] || ''}"`).join(','));
+        const csvContent = "﻿" + headers.join(',') + "\n" + rows.join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        downloadBlob(blob, fileName);
+    }
+
+    async function clearData() {
+        const ok = await dialogConfirm({ title: '清空页面数据', message: '确定要清空当前页面生成的数据吗？历史保存记录不受影响。', confirmText: '确认清空', danger: true });
+        if (ok) {
+            document.getElementById('tableBody').innerHTML = '';
+            document.getElementById('p_tableBody').innerHTML = '';
+            document.getElementById('printLabels').innerHTML = '';
+            globalData = [];
+            setDirty(false);
+        }
+    }
+
+    function openHelp() { openModalEl(document.getElementById('helpModal')); }
+
+    // ========== 桌面快捷键 ==========
+    document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            e.preventDefault();
+            generateBatches();
+        }
+    });
+
+    // ========== 启动 ==========
+    fillIcons();
+    autoGenerateMotherRoll();
+</script>
+</body>
+</html>
